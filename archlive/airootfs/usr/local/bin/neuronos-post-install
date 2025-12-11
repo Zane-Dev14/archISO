@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+set -e
+
+# NeuronOS post-install script (runs inside installed system via arch-chroot)
+MARKER=/etc/neuronos-post-install-done
+if [ -f "$MARKER" ]; then
+  echo "NeuronOS post-install already completed, exiting."
+  exit 0
+fi
+
+echo "== NeuronOS post-install: creating capstone user and enabling services =="
+
+# create capstone user
+if ! id -u capstone >/dev/null 2>&1; then
+  useradd -m -G wheel,docker -s /usr/bin/zsh capstone
+  echo "capstone:password" | chpasswd
+  echo "Created user 'capstone' with default password 'password' (please change)."
+else
+  echo "User capstone already exists."
+fi
+
+# enable wheel sudo (ensure sudo is installed)
+if ! grep -q "^%wheel ALL=(ALL:ALL) ALL" /etc/sudoers 2>/dev/null; then
+  # prefer uncommenting existing line if present
+  sed -i 's/^# %wheel/%wheel/' /etc/sudoers || true
+  if ! grep -q "^%wheel ALL=(ALL:ALL) ALL" /etc/sudoers; then
+    echo "%wheel ALL=(ALL:ALL) ALL" >> /etc/sudoers
+  fi
+fi
+
+# enable common services
+systemctl enable NetworkManager || true
+systemctl enable sshd || true
+systemctl enable docker || true
+systemctl enable sddm || true
+
+# configure SDDM autologin for capstone
+mkdir -p /etc/sddm.conf.d
+cat > /etc/sddm.conf.d/autologin.conf <<'EOF'
+[Autologin]
+User=capstone
+Session=plasma
+EOF
+
+# create first-boot ML setup service (one-shot, runs as capstone)
+cat > /usr/local/bin/neuronos-ml-setup <<'ML'
+#!/usr/bin/env bash
+set -e
+# run as user capstone - do not use sudo inside the script
+echo "Running NeuronOS ML first-boot setup..."
+# wait for network
+for i in {1..10}; do ping -c1 8.8.8.8 >/dev/null 2>&1 && break || sleep 2; done
+# update pacman DB
+pacman -Sy --noconfirm
+# (install light ML components as user-local or system-wide as desired)
+# Example: pip into user site; heavy installs may be left for manual run.
+su -l capstone -c "pip install --user --break-system-packages transformers jupyterlab"
+echo "ML setup (minimal) finished."
+ML
+
+chmod +x /usr/local/bin/neuronos-ml-setup
+
+# create the systemd oneshot unit to run at first graphical.target
+cat > /etc/systemd/system/neuronos-ml-setup.service <<'UNIT'
+[Unit]
+Description=NeuronOS ML Environment Setup (First Boot)
+After=graphical.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=capstone
+Environment=HOME=/home/capstone
+ExecStart=/usr/local/bin/neuronos-ml-setup
+ExecStartPost=/usr/bin/touch /etc/neuronos-ml-setup-done
+RemainAfterExit=yes
+
+[Install]
+WantedBy=graphical.target
+UNIT
+
+systemctl enable neuronos-ml-setup.service || true
+
+# mark done
+touch "$MARKER"
+echo "NeuronOS post-install completed."

@@ -34,16 +34,6 @@ else
 fi
 
 # Create system-wide autostart .desktop that runs the installer via sh (avoids needing +x)
-mkdir -p /etc/xdg/autostart
-cat > /etc/xdg/autostart/neuronos-installer.desktop <<'EOF'
-[Desktop Entry]
-Type=Application
-Name=NeuronOS Installer
-Exec=sh -c "/usr/local/bin/neuronos-installer > /tmp/neuronos-installer.log 2>&1"
-Terminal=false
-X-GNOME-Autostart-enabled=true
-EOF
-chmod 644 /etc/xdg/autostart/neuronos-installer.desktop
 
 # Create per-user autostart script in the capstone home (this is the guaranteed fallback)
 mkdir -p /home/capstone/.config/autostart-scripts

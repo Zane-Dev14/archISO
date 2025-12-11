@@ -1,0 +1,50 @@
+{
+  "profile": {
+    "main": "Desktop",
+    "details": ["KDE"]
+  },
+  "hostname": "neuronos",
+  "timezone": "UTC",
+  "ntp": true,
+  "sys-language": "en_US",
+  "sys-encoding": "UTF-8",
+
+  "kernels": ["linux-mits-capstone"],
+
+  "bootloader": "grub",
+
+  "packages": [
+    "base",
+    "linux-firmware",
+    "networkmanager",
+    "sudo",
+    "nano",
+    "vim",
+    "git",
+    "wget",
+    "curl",
+    "python",
+    "python-pip",
+    "docker",
+    "plasma-desktop",
+    "sddm",
+    "konsole",
+    "dolphin",
+    "firefox"
+  ],
+
+  "services": ["NetworkManager", "sshd", "sddm"],
+
+  "authentication": {
+    "root_password": "password"
+  },
+
+  "users": [
+    {
+      "name": "capstone",
+      "password": "password",
+      "groups": ["wheel","docker"],
+      "sudo": true
+    }
+  ]
+}

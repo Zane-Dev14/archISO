@@ -1,0 +1,17 @@
+[Unit]
+Description=Auto run Archinstall guided installer on multi-user.target
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=idle
+ExecStartPre=/usr/bin/pacman -Sy --noconfirm
+ExecStart=/usr/bin/archinstall --config /etc/archinstall/custom-profile.json
+StandardInput=tty
+TTYPath=/dev/tty1
+StandardOutput=journal
+StandardError=journal
+
+
+[Install]
+WantedBy=multi-user.target
