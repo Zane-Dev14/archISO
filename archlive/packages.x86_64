@@ -1,0 +1,61 @@
+# --- Custom Kernel ---
+linux-mits-capstone
+linux-mits-capstone-headers
+
+# --- Base System & Bootloaders ---
+base
+base-devel
+grub
+efibootmgr
+os-prober
+syslinux
+memtest86+
+memtest86+-efi
+edk2-shell
+
+# --- Graphics / X11 ---
+xorg-server
+mesa
+xf86-video-vesa
+xorg-xinit
+plasma-workspace
+
+# --- KDE Plasma minimal desktop ---
+plasma-desktop
+sddm
+plasma-nm
+polkit-kde-agent
+kdialog
+fastfetch
+
+# --- Essential KDE apps ---
+konsole
+dolphin
+firefox
+yay
+
+# --- Shell / Utilities (only zsh, no bash-extras/other terminals) ---
+zsh
+zsh-completions
+sudo
+git
+htop
+wget
+curl
+tmux
+vim
+nano
+unzip
+p7zip
+openssh
+networkmanager
+nm-connection-editor
+
+# --- Development Toolchains (minimal for Python/AI setup) ---
+python
+python-pip
+python-virtualenv
+docker
+
+# --- Installer ---
+archinstall

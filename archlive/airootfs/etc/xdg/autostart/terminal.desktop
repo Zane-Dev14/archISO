@@ -1,0 +1,7 @@
+# airootfs/etc/xdg/autostart/terminal.desktop
+[Desktop Entry]
+Type=Application
+Name=Kitty Terminal
+Exec=kitty
+Terminal=false
+Categories=System;

@@ -1,0 +1,62 @@
+#!/bin/bash
+set -e
+
+export YAY_CONFIRM=1
+export YAY_NCURSES=0
+export YAY_AUR=1
+# Refresh package DB
+sudo pacman -Sy --noconfirm
+
+# Ensure all build dependencies exist
+sudo pacman -S --noconfirm base-devel git wget cmake ninja gobject-introspection docbook-xsl
+
+CHOICES=$(kdialog --separate-output --checklist "Select components to install:" \
+  1 "HuggingFace (transformers, datasets, accelerate)" on \
+  2 "JupyterLab + Widgets" on \
+  3 "CUDA + NVIDIA Drivers" off \
+  4 "TensorFlow + PyTorch (CUDA)" off \
+  5 "ONNX + Utilities" off \
+  6 "VSC + Discord" on)
+
+TOTAL=$(echo "$CHOICES" | wc -l)
+COUNT=0
+
+for choice in $CHOICES; do
+  COUNT=$((COUNT + 1))
+  case $choice in
+    1)
+      kdialog --progressbar "Installing HuggingFace libraries..." $TOTAL
+      pip install --break-system-packages transformers accelerate datasets safetensors sentencepiece \
+        2>&1 | while read -r line; do
+          kdialog --passivepopup "$line" 1
+        done
+      ;;
+    2)
+      kdialog --progressbar "Installing JupyterLab + Widgets..." $TOTAL
+      pip install --break-system-packages jupyterlab ipywidgets plotly tensorboard numpy \
+        2>&1 | while read -r line; do
+          kdialog --passivepopup "$line" 1
+        done
+      ;;
+    3)
+      kdialog --progressbar "Installing NVIDIA / CUDA drivers..." $TOTAL
+      sudo pacman -Syu --noconfirm nvidia-dkms nvidia-utils nvidia-settings opencl-nvidia cuda cudnn nvtop nvidia-prime
+      ;;
+    4)
+      kdialog --progressbar "Installing TensorFlow + PyTorch..." $TOTAL
+      sudo pacman -Syu --noconfirm python-pytorch-cuda python-tensorflow-cuda
+      ;;
+    5)
+      kdialog --progressbar "Installing ONNX + utilities..." $TOTAL
+      sudo pacman -Syu --noconfirm onnxruntime python-onnx
+      ;;
+    6)
+      kdialog --progressbar "Installing VS Code + Discord..." $TOTAL
+      yay -S --needed --noconfirm visual-studio-code-bin
+      yay -S --needed --noconfirm discord-canary
+      ;;
+  esac
+done
+
+kdialog --msgbox "Installation complete! Please reboot if drivers were installed."
+rm -f /etc/xdg/autostart/neuronos-installer.desktop

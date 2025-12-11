@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Exec=konsole
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Name=Konsole
+Comment=Start a terminal

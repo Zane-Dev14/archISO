@@ -1,0 +1,9 @@
+# /etc/xdg/autostart/neuronos-installer.desktop
+[Desktop Entry]
+Type=Application
+Exec=/usr/local/bin/neuronos-installer
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Name=NeuronOS Installer
+Comment=Install AI/ML tools and drivers
