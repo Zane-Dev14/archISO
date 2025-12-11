@@ -1,92 +1,102 @@
 {
-    "config_version": "2.8.6",
-    
-    "!root-password": "password",
-    
-    "!users": [
-        {
-            "username": "capstone",
-            "!password": "password",
-            "sudo": true
-        }
-    ],
-    
-    "hostname": "neuronos",
-    
-    "kernels": [
-        "linux-mits-capstone"
-    ],
-    
-    "packages": [
-        "base",
-        "linux-firmware",
-        "linux-mits-capstone",
-        "linux-mits-capstone-headers",
-        "grub",
-        "efibootmgr",
-        "os-prober",
-        "networkmanager",
-        "sudo",
-        "xorg-server",
-        "mesa",
-        "xf86-video-vesa",
-        "xorg-xinit",
-        "plasma-workspace",
-        "plasma-desktop",
-        "sddm",
-        "plasma-nm",
-        "polkit-kde-agent",
-        "kdialog",
-        "fastfetch",
-        "konsole",
-        "dolphin",
-        "firefox",
-        "zsh",
-        "zsh-completions",
-        "htop",
-        "wget",
-        "curl",
-        "tmux",
-        "vim",
-        "nano",
-        "unzip",
-        "p7zip",
-        "openssh",
-        "nm-connection-editor",
-        "nvidia-dkms",
-        "nvidia-utils",
-        "cuda",
-        "python",
-        "python-pip",
-        "python-virtualenv",
-        "docker",
-        "jupyterlab",
-        "python-ipykernel",
-        "python-ipywidgets"
-    ],
-    
-    "profile": {
-        "main": "Desktop",
-        "details": ["KDE"]
-    },
-    
-    "audio": "pipewire",
-    
-    "bootloader": "Grub",
-    
-    "timezone": "UTC",
-    
-    "ntp": true,
-    
-    "additional-repositories": [],
-    
-    "network_config": {
-        "type": "nm"
-    },
-    
-    "custom-commands": [
-        "systemctl enable NetworkManager",
-        "systemctl enable docker",
-        "systemctl enable sddm"
-    ]
+  "config_version": "2.8.6",
+
+  "!root-password": "password",
+
+  "!users": [
+    {
+      "username": "capstone",
+      "!password": "password",
+      "sudo": true
+    }
+  ],
+
+  "hostname": "neuronos",
+
+  "kernels": [
+    "linux-mits-capstone"
+  ],
+
+  "packages": [
+    "base",
+    "linux-firmware",
+    "linux-mits-capstone",
+    "linux-mits-capstone-headers",
+    "grub",
+    "efibootmgr",
+    "os-prober",
+    "networkmanager",
+    "sudo",
+    "xorg-server",
+    "mesa",
+    "mesa-vulkan-drivers",
+    "vulkan-icd-loader",
+    "vulkan-mesa-layers",
+    "libva-mesa-driver",
+    "xf86-video-vesa",
+    "xorg-xinit",
+    "plasma-workspace",
+    "plasma-desktop",
+    "sddm",
+    "plasma-nm",
+    "polkit-kde-agent",
+    "kdialog",
+    "fastfetch",
+    "konsole",
+    "dolphin",
+    "firefox",
+    "zsh",
+    "zsh-completions",
+    "htop",
+    "wget",
+    "curl",
+    "tmux",
+    "vim",
+    "nano",
+    "unzip",
+    "p7zip",
+    "openssh",
+    "nm-connection-editor",
+    "nvidia-dkms",
+    "nvidia-utils",
+    "cuda",
+    "python",
+    "python-pip",
+    "python-virtualenv",
+    "docker",
+    "jupyterlab",
+    "python-ipykernel",
+    "python-ipywidgets",
+    "zram-generator",
+    "yay"
+  ],
+
+  "profile": {
+    "main": "Desktop",
+    "details": ["KDE"]
+  },
+
+  "audio": "pipewire",
+
+  "bootloader": "Grub",
+
+  "timezone": "UTC",
+
+  "ntp": true,
+
+  "additional-repositories": [],
+
+  "network_config": {
+    "type": "nm"
+  },
+
+  "custom-commands": [
+    "systemctl enable NetworkManager",
+    "systemctl enable docker",
+    "systemctl enable sddm"
+  ],
+
+  "post-install-commands": [
+    "/usr/local/bin/neuronos-post-install"
+  ]
 }

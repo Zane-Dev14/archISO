@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
 # NeuronOS post-install script (runs inside installed system via arch-chroot)
 MARKER=/etc/neuronos-post-install-done
@@ -10,7 +10,7 @@ fi
 
 echo "== NeuronOS post-install: creating capstone user and enabling services =="
 
-# create capstone user
+# create capstone user (if not present)
 if ! id -u capstone >/dev/null 2>&1; then
   useradd -m -G wheel,docker -s /usr/bin/zsh capstone
   echo "capstone:password" | chpasswd
@@ -19,22 +19,22 @@ else
   echo "User capstone already exists."
 fi
 
-# enable wheel sudo (ensure sudo is installed)
-if ! grep -q "^%wheel ALL=(ALL:ALL) ALL" /etc/sudoers 2>/dev/null; then
-  # prefer uncommenting existing line if present
-  sed -i 's/^# %wheel/%wheel/' /etc/sudoers || true
-  if ! grep -q "^%wheel ALL=(ALL:ALL) ALL" /etc/sudoers; then
-    echo "%wheel ALL=(ALL:ALL) ALL" >> /etc/sudoers
-  fi
+# Ensure sudo for wheel (uncomment NOPASSWD if you prefer)
+if grep -q "^# %wheel ALL=(ALL:ALL) NOPASSWD: ALL" /etc/sudoers 2>/dev/null; then
+  sed -i 's/^# %wheel ALL=(ALL:ALL) NOPASSWD: ALL/%wheel ALL=(ALL:ALL) NOPASSWD: ALL/' /etc/sudoers || true
+fi
+# If wheel line not present, ensure a sane sudoers entry exists
+if ! grep -q "^%wheel ALL=(ALL:ALL)" /etc/sudoers 2>/dev/null; then
+  echo "%wheel ALL=(ALL:ALL) ALL" >> /etc/sudoers
 fi
 
-# enable common services
+# enable common services (chroot phase)
 systemctl enable NetworkManager || true
 systemctl enable sshd || true
 systemctl enable docker || true
 systemctl enable sddm || true
 
-# configure SDDM autologin for capstone
+# configure SDDM autologin for capstone (Plasma session)
 mkdir -p /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/autologin.conf <<'EOF'
 [Autologin]
@@ -42,25 +42,126 @@ User=capstone
 Session=plasma
 EOF
 
-# create first-boot ML setup service (one-shot, runs as capstone)
+# zram config (uses zram-generator)
+cat > /etc/systemd/zram-generator.conf <<'EOF'
+[zram0]
+zram-size = ram / 2
+compression-algorithm = zstd
+EOF
+
+# Disable unnecessary services to keep system fast
+systemctl mask bluetooth.service || true
+systemctl disable cups.service || true
+systemctl disable irqbalance.service || true
+
+# Attempt to install Mambaforge into /opt/mambaforge during chroot (best-effort)
+# If network/chroot prevents it, the first-boot oneshot will finish the job.
+MF_INSTALLER="Mambaforge-23.11-1-Linux-x86_64.sh"
+MF_URL="https://github.com/conda-forge/miniforge/releases/latest/download/${MF_INSTALLER}"
+MF_PREFIX="/opt/mambaforge"
+install_mambaforge() {
+  if [ -x "${MF_PREFIX}/bin/mamba" ]; then
+    echo "Mambaforge already installed at ${MF_PREFIX}"
+    return 0
+  fi
+  echo "Attempting to download and install Mambaforge into ${MF_PREFIX}..."
+  if command -v curl >/dev/null 2>&1; then
+    curl -L -o /tmp/${MF_INSTALLER} "${MF_URL}" || return 1
+  elif command -v wget >/dev/null 2>&1; then
+    wget -O /tmp/${MF_INSTALLER} "${MF_URL}" || return 1
+  else
+    echo "curl/wget not available in chroot; will defer Mambaforge install to first boot."
+    return 1
+  fi
+
+  bash /tmp/${MF_INSTALLER} -b -p "${MF_PREFIX}" || return 1
+  chown -R root:root "${MF_PREFIX}" || true
+  echo "Mambaforge installed (chroot)."
+  return 0
+}
+
+# Create the first-boot ML setup script (runs as capstone, idempotent)
 cat > /usr/local/bin/neuronos-ml-setup <<'ML'
 #!/usr/bin/env bash
-set -e
-# run as user capstone - do not use sudo inside the script
+set -euo pipefail
+MARKER=/etc/neuronos-ml-setup-done
+if [ -f "$MARKER" ]; then
+  echo "NeuronOS ML setup already completed, exiting."
+  exit 0
+fi
 echo "Running NeuronOS ML first-boot setup..."
-# wait for network
-for i in {1..10}; do ping -c1 8.8.8.8 >/dev/null 2>&1 && break || sleep 2; done
-# update pacman DB
-pacman -Sy --noconfirm
-# (install light ML components as user-local or system-wide as desired)
-# Example: pip into user site; heavy installs may be left for manual run.
-su -l capstone -c "pip install --user --break-system-packages transformers jupyterlab"
-echo "ML setup (minimal) finished."
+
+# Wait for network up (short loop)
+for i in {1..30}; do
+  ping -c1 8.8.8.8 >/dev/null 2>&1 && break
+  sleep 2
+done
+
+# ensure pacman DB up-to-date (as normal user we may need sudo - here run safe update)
+sudo pacman -Sy --noconfirm || true
+
+# install cudnn via pacman if available (optional)
+if pacman -Qi cudnn >/dev/null 2>&1; then
+  sudo pacman -S --noconfirm cudnn || true
+fi
+
+# Install Mambaforge if missing (as root)
+MF_PREFIX=/opt/mambaforge
+MF_INSTALLER="Mambaforge-23.11-1-Linux-x86_64.sh"
+MF_URL="https://github.com/conda-forge/miniforge/releases/latest/download/${MF_INSTALLER}"
+if [ ! -x "${MF_PREFIX}/bin/mamba" ]; then
+  echo "Downloading Mambaforge to /tmp..."
+  if command -v curl >/dev/null 2>&1; then
+    curl -L -o /tmp/${MF_INSTALLER} "${MF_URL}"
+  else
+    wget -O /tmp/${MF_INSTALLER} "${MF_URL}"
+  fi
+  sudo bash /tmp/${MF_INSTALLER} -b -p "${MF_PREFIX}"
+  sudo chown -R root:root "${MF_PREFIX}"
+fi
+
+# Ensure PATH includes mamba
+export PATH=${MF_PREFIX}/bin:$PATH
+
+# Inspect installed CUDA version to choose conda cuda build
+CUDA_PKG_VER=""
+if pacman -Qi cuda >/dev/null 2>&1; then
+  CUDA_PKG_VER="$(pacman -Qi cuda | awk '/Version/ {print $3; exit}')"
+fi
+
+# Choose pytorch-cuda package for mamba (best-effort) - default to 13.0 if cannot detect
+PYTORCH_CUDA_SPEC="pytorch-cuda=13.0"
+if [ -n "$CUDA_PKG_VER" ]; then
+  # quick heuristic: extract major.minor from pacman version (e.g., 13.0.2 -> 13.0)
+  ver_major_minor="$(echo ${CUDA_PKG_VER} | awk -F. '{printf \"%s.%s\", $1, $2}')"
+  PYTORCH_CUDA_SPEC="pytorch-cuda=${ver_major_minor}"
+  echo "Detected CUDA package version: ${CUDA_PKG_VER} -> using ${PYTORCH_CUDA_SPEC}"
+fi
+
+# Create conda env 'ml' with GPU-enabled PyTorch, JAX, and core libs
+/opt/mambaforge/bin/mamba create -y -n ml python=3.11 -c pytorch -c nvidia -c conda-forge \
+  "pytorch" "${PYTORCH_CUDA_SPEC}" "torchvision" "torchaudio" "jax" "jaxlib" "pillow" "numpy" "scipy" "scikit-learn"
+
+# Upgrade pip inside env and pip-install HF and extras
+/opt/mambaforge/bin/mamba run -n ml /opt/mambaforge/bin/pip install --upgrade pip
+/opt/mambaforge/bin/mamba run -n ml /opt/mambaforge/bin/pip install transformers accelerate datasets bitsandbytes evaluate sentencepiece
+
+# convenience wrapper for ml python
+sudo tee /usr/local/bin/mlpython >/dev/null <<'EOF'
+#!/bin/sh
+exec /opt/mambaforge/bin/mamba run -n ml python "\$@"
+EOF
+sudo chmod +x /usr/local/bin/mlpython
+
+# mark done
+sudo /usr/bin/touch /etc/neuronos-ml-setup-done
+echo "NeuronOS ML setup completed."
 ML
 
 chmod +x /usr/local/bin/neuronos-ml-setup
+chown root:root /usr/local/bin/neuronos-ml-setup
 
-# create the systemd oneshot unit to run at first graphical.target
+# create the systemd oneshot unit to run at first boot (as capstone)
 cat > /etc/systemd/system/neuronos-ml-setup.service <<'UNIT'
 [Unit]
 Description=NeuronOS ML Environment Setup (First Boot)
@@ -79,7 +180,28 @@ RemainAfterExit=yes
 WantedBy=graphical.target
 UNIT
 
+# enable oneshot so it runs on first boot (and is idempotent)
 systemctl enable neuronos-ml-setup.service || true
+
+# Try to install Mambaforge now (best-effort). If it fails, the oneshot will run it at first boot.
+if ! install_mambaforge; then
+  echo "Mambaforge install deferred to first-boot oneshot."
+fi
+
+# Ensure sddm is enabled and will start on first boot
+systemctl enable sddm || true
+
+# Create convenience PATH for mambaforge for all users (if mambaforge installed)
+/opt/mambaforge/bin/conda --version >/dev/null 2>&1 && {
+  cat > /etc/profile.d/mambaforge.sh <<'EOF'
+# Mambaforge system-wide
+export PATH=/opt/mambaforge/bin:$PATH
+EOF
+  chmod 0644 /etc/profile.d/mambaforge.sh
+}
+
+# Clean pacman caches (keep package files out of chroot to save space)
+pacman -Scc --noconfirm || true
 
 # mark done
 touch "$MARKER"
