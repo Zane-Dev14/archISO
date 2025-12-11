@@ -1,0 +1,12 @@
+v2/local_repo/*
+work/*
+yay/*
+6.16.4-2-mits-capstone-Mits-Capstone/*
+initramfs-linux-mits-capstone-fallback.img
+initramfs-linux-mits-capstone.img
+/yay
+/out/*
+out/*
+*.iso
+v2/work/*
+v2/build/*
