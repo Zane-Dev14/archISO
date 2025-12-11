@@ -17,7 +17,7 @@
     "linux-mits-capstone"
   ],
 
-  "packages": [
+ "packages": [
     "base",
     "linux-firmware",
     "linux-mits-capstone",
@@ -29,10 +29,8 @@
     "sudo",
     "xorg-server",
     "mesa",
-    "mesa-vulkan-drivers",
     "vulkan-icd-loader",
     "vulkan-mesa-layers",
-    "libva-mesa-driver",
     "xf86-video-vesa",
     "xorg-xinit",
     "plasma-workspace",
@@ -69,7 +67,7 @@
     "python-ipywidgets",
     "zram-generator",
     "yay"
-  ],
+],
 
   "profile": {
     "main": "Desktop",
